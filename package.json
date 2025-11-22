@@ -1,0 +1,38 @@
+{
+  "name": "schema-sheets-get",
+  "version": "1.0.0",
+  "description": "get a single value from a schema-sheet",
+  "keywords": [
+    "schema",
+    "sheets",
+    "p2p"
+  ],
+  "homepage": "https://github.com/ryanramage/schema-sheets-get#readme",
+  "bugs": {
+    "url": "https://github.com/ryanramage/schema-sheets-get/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ryanramage/schema-sheets-get.git"
+  },
+  "license": "ISC",
+  "author": "Ryan Ramage",
+  "type": "mjs",
+  "bin": {
+    "schema-sheets-get": "get.mjs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "blind-peering": "^1.15.0",
+    "corestore": "^7.6.1",
+    "graceful-goodbye": "^1.3.3",
+    "hyperswarm": "^4.15.1",
+    "paparam": "^1.8.5",
+    "protomux-wakeup": "^2.9.0",
+    "schema-sheets": "^3.1.1",
+    "temp-path": "^1.0.0",
+    "z32": "^1.1.0"
+  }
+}

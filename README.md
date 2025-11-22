@@ -14,7 +14,7 @@ npm install -g schema-sheets-get
 schema-sheets-get [options] <room-key> <query>
 ```
 
-See [Setting up your secrets](#repo) for creating a repo of secrets to query.
+See [Setting up your secrets](#setting-up-secrets) for creating a repo of secrets to query.
 
 ### Basic Example
 

@@ -1,6 +1,6 @@
 # schema-sheets-get
 
-A CLI tool for retrieving values from a P2P database called Schema Sheets. Designed for scripting and tooling environments where teams need to access configuration values, API keys, or other data without hardcoding them.
+A CLI tool for retrieving values from a P2P schema-sheets database. Designed for scripting and tooling environments where teams need to access configuration values, API keys, or other data without hardcoding them.
 
 ## Installation
 
@@ -608,7 +608,7 @@ source <(schema-sheets-get --export -s ./storage <room-key> staging/app1:api-key
 Use [schema-sheets-cli](https://github.com/ryanramage/schema-sheets-cli) to create your secrets repository.
  
 1. create a room
-2. define a schema (eg app, environment, retired, url, password, apiKey, etc)
+2. define a schema (eg app, environment, retired, apiKey, etc)
 3. create named query for each app/environment eg 'staging/app1'
 4. add entries as you need them
 

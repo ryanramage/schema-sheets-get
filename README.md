@@ -14,6 +14,8 @@ npm install -g schema-sheets-get
 schema-sheets-get [options] <room-key> <query>
 ```
 
+See [Setting up your secrets](#repo) for creating a repo of secrets to query.
+
 ### Basic Example
 
 ```bash
@@ -600,6 +602,16 @@ echo "DATABASE_URL=$DATABASE_URL"
 # Use --export for sourcing
 source <(schema-sheets-get --export -s ./storage <room-key> staging/app1:api-key,database-url)
 ```
+
+## Setting up secrets {#repo}
+
+Use [schema-sheets-cli](https://github.com/ryanramage/schema-sheets-cli) to create your secrets repository.
+ 
+1. create a room
+2. define a schema (eg app, environment, retired, url, password, apiKey, etc)
+3. create named query for each app/environment eg 'staging/app1'
+4. add entries as you need them
+
 
 ## Examples Repository
 

@@ -603,7 +603,7 @@ echo "DATABASE_URL=$DATABASE_URL"
 source <(schema-sheets-get --export -s ./storage <room-key> staging/app1:api-key,database-url)
 ```
 
-## Setting up secrets {#repo}
+## Setting up secrets
 
 Use [schema-sheets-cli](https://github.com/ryanramage/schema-sheets-cli) to create your secrets repository.
  

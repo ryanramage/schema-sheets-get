@@ -16,26 +16,43 @@ schema-sheets-get [options] <room-key> <query>
 
 See [Setting up your secrets](#setting-up-secrets) for creating a repo of secrets to query.
 
-### Basic Example
+### Basic Examples
 
+**Named Queries (using `-n` flag):**
 ```bash
 # Single property (returns first field value)
-schema-sheets-get -s ./storage <room-key> staging/app1
+schema-sheets-get -n -s ./storage <room-key> staging/app1
 
 # Multiple properties with shell-eval format
-schema-sheets-get -s ./storage <room-key> staging/app1:api-key,database-url,secret
+schema-sheets-get -n -s ./storage <room-key> staging/app1:api-key,database-url,secret
 
 # Multiple properties with JSON output
-schema-sheets-get --json -s ./storage <room-key> staging/app1:api-key,database-url
+schema-sheets-get -n --json -s ./storage <room-key> staging/app1:api-key,database-url
 
 # Multiple properties with export prefix
-schema-sheets-get --export -s ./storage <room-key> staging/app1:api-key,database-url
+schema-sheets-get -n --export -s ./storage <room-key> staging/app1:api-key,database-url
+```
+
+**JMESPath Queries (default mode):**
+```bash
+# Query specific environment and app
+schema-sheets-get -s ./storage <room-key> "environments[?name=='staging'].apps[?name=='app1'].config"
+
+# Get all API keys across environments
+schema-sheets-get -s ./storage <room-key> "environments[].apps[].config.apiKey"
+
+# Complex filtering and transformation
+schema-sheets-get -s ./storage <room-key> "environments[?name=='prod'].apps[].{name: name, apiKey: config.apiKey, dbUrl: config.databaseUrl}"
+
+# Simple property access
+schema-sheets-get -s ./storage <room-key> "config.apiKey"
 ```
 
 ### Options
 
+- `-n, --named-query` - Treat query argument as a named query (enables property selection with `:`)
 - `-s, --storage <path>` - Storage directory path for caching (recommended for performance)
-- `-j, --json` - Output multiple properties as JSON
+- `-j, --json` - Output as JSON
 - `-e, --export` - Prefix shell-eval output with `export` keyword
 - `-b, --blind <key>` - Blind peer keys (can be specified multiple times)
 - `-d, --debug` - Enable debug output
@@ -45,28 +62,47 @@ schema-sheets-get --export -s ./storage <room-key> staging/app1:api-key,database
 ### Arguments
 
 - `<room-key>` - The P2P room key for accessing the Schema Sheets database
-- `<query>` - Query path, optionally with properties: `query-name` or `query-name:prop1,prop2,prop3`
+- `<query>` - JMESPath query to execute, or named query when using `-n` flag
 
 ## Query Syntax
 
-### Single Property Mode
+The tool supports two query modes:
 
-When you specify just a query name, the tool returns the value of the first field:
+### JMESPath Queries (Default)
+
+Use JMESPath syntax to query your data directly. This is the most flexible and powerful mode:
 
 ```bash
-schema-sheets-get -s ./storage <room-key> staging/app1
+# Query specific data
+schema-sheets-get -s ./storage <room-key> "environments[?name=='staging'].apps[?name=='app1'].config"
+
+# Filter and transform
+schema-sheets-get -s ./storage <room-key> "environments[?name=='prod'].apps[].{name: name, key: config.apiKey}"
+
+# Simple property access
+schema-sheets-get -s ./storage <room-key> "config.apiKey"
+```
+
+### Named Queries (with `-n` flag)
+
+Use predefined named queries with optional property selection:
+
+**Single Property Mode:**
+```bash
+schema-sheets-get -n -s ./storage <room-key> staging/app1
 # Output: value-of-first-field
 ```
 
-### Multiple Properties Mode
-
+**Multiple Properties Mode:**
 Use a colon (`:`) to separate the query name from property names, and commas (`,`) between properties:
 
 ```bash
-schema-sheets-get -s ./storage <room-key> staging/app1:api-key,database-url,secret
+schema-sheets-get -n -s ./storage <room-key> staging/app1:api-key,database-url,secret
 ```
 
-**Output formats:**
+## Output Formats
+
+Both query modes support the same output formats:
 
 1. **Shell-eval format (default)** - Ready for `eval` command:
 ```bash
@@ -101,18 +137,24 @@ For shell-eval format, property names are automatically transformed to valid she
 ### Single Value Retrieval
 
 ```bash
-# Store result in variable
-API_KEY=$(schema-sheets-get -s ./storage <room-key> prod/api-key)
+# Using JMESPath queries
+API_KEY=$(schema-sheets-get -s ./storage <room-key> "config.apiKey")
+
+# Using named queries
+API_KEY=$(schema-sheets-get -n -s ./storage <room-key> prod/api-key)
 
 # Use directly in commands
-curl -H "Authorization: Bearer $(schema-sheets-get -s ./storage <room-key> prod/token)" https://api.example.com
+curl -H "Authorization: Bearer $(schema-sheets-get -s ./storage <room-key> "config.token")" https://api.example.com
 ```
 
 ### Multiple Values with eval
 
 ```bash
-# Load multiple values into environment
-eval $(schema-sheets-get -s ./storage <room-key> staging/app1:api-key,database-url,secret)
+# Using JMESPath queries
+eval $(schema-sheets-get -s ./storage <room-key> "environments[?name=='staging'].apps[?name=='app1'].config | [0]")
+
+# Using named queries
+eval $(schema-sheets-get -n -s ./storage <room-key> staging/app1:api-key,database-url,secret)
 
 # Now use the variables
 echo $API_KEY
@@ -123,25 +165,31 @@ echo $SECRET
 ### Multiple Values with export and source
 
 ```bash
-# Generate a sourceable file
-schema-sheets-get --export -s ./storage <room-key> prod/app1:api-key,db-url > .env
+# Using JMESPath queries
+schema-sheets-get --export -s ./storage <room-key> "config.{apiKey: apiKey, dbUrl: databaseUrl}" > .env
+
+# Using named queries
+schema-sheets-get -n --export -s ./storage <room-key> prod/app1:api-key,db-url > .env
 
 # Source it
 source .env
 
 # Or use process substitution
-source <(schema-sheets-get --export -s ./storage <room-key> prod/app1:api-key,db-url)
+source <(schema-sheets-get -n --export -s ./storage <room-key> prod/app1:api-key,db-url)
 ```
 
 ### Multiple Values with JSON
 
 ```bash
-# Get JSON output
-CONFIG=$(schema-sheets-get --json -s ./storage <room-key> staging/app1:api-key,database-url)
+# Using JMESPath queries
+CONFIG=$(schema-sheets-get --json -s ./storage <room-key> "config.{apiKey: apiKey, dbUrl: databaseUrl}")
+
+# Using named queries
+CONFIG=$(schema-sheets-get -n --json -s ./storage <room-key> staging/app1:api-key,database-url)
 
 # Parse with jq
-API_KEY=$(echo $CONFIG | jq -r '.["api-key"]')
-DATABASE_URL=$(echo $CONFIG | jq -r '.["database-url"]')
+API_KEY=$(echo $CONFIG | jq -r '.apiKey // .["api-key"]')
+DATABASE_URL=$(echo $CONFIG | jq -r '.dbUrl // .["database-url"]')
 ```
 
 ### Environment-Specific Configuration
@@ -153,8 +201,8 @@ ENVIRONMENT=${1:-staging}
 STORAGE_DIR="./schema-sheets-cache"
 ROOM_KEY="<your-room-key>"
 
-# Load all environment variables at once
-eval $(schema-sheets-get -s "$STORAGE_DIR" "$ROOM_KEY" "$ENVIRONMENT/app1:api-key,database-url,redis-url,secret")
+# Load all environment variables at once (using named queries)
+eval $(schema-sheets-get -n -s "$STORAGE_DIR" "$ROOM_KEY" "$ENVIRONMENT/app1:api-key,database-url,redis-url,secret")
 
 echo "Deploying to $ENVIRONMENT..."
 echo "Database: $DATABASE_URL"
@@ -198,8 +246,8 @@ jobs:
         env:
           ROOM_KEY: ${{ secrets.SCHEMA_SHEETS_ROOM_KEY }}
         run: |
-          # Load all config at once
-          eval $(schema-sheets-get -s ./schema-sheets-cache "$ROOM_KEY" prod/app1:api-key,database-url,redis-url)
+          # Load all config at once (using named queries)
+          eval $(schema-sheets-get -n -s ./schema-sheets-cache "$ROOM_KEY" prod/app1:api-key,database-url,redis-url)
           
           # Deploy with loaded variables
           echo "Deploying with API_KEY and DATABASE_URL..."
@@ -214,7 +262,7 @@ jobs:
         env:
           ROOM_KEY: ${{ secrets.SCHEMA_SHEETS_ROOM_KEY }}
         run: |
-          CONFIG=$(schema-sheets-get --json -s ./cache "$ROOM_KEY" prod/app1:api-key,database-url)
+          CONFIG=$(schema-sheets-get -n --json -s ./cache "$ROOM_KEY" prod/app1:api-key,database-url)
           echo "config=$CONFIG" >> $GITHUB_OUTPUT
           
       - name: Deploy
@@ -243,7 +291,7 @@ before_script:
 deploy_production:
   stage: deploy
   script:
-    - eval $(schema-sheets-get -s "$STORAGE_DIR" "$SCHEMA_SHEETS_ROOM_KEY" prod/app1:api-key,database-url,redis-url)
+    - eval $(schema-sheets-get -n -s "$STORAGE_DIR" "$SCHEMA_SHEETS_ROOM_KEY" prod/app1:api-key,database-url,redis-url)
     - echo "Deploying with $API_KEY"
     - ./deploy.sh
   only:
@@ -273,7 +321,7 @@ pipeline {
                 script {
                     // Get JSON output
                     def configJson = sh(
-                        script: "schema-sheets-get --json -s ${STORAGE_DIR} ${ROOM_KEY} prod/app1:api-key,database-url,redis-url",
+                        script: "schema-sheets-get -n --json -s ${STORAGE_DIR} ${ROOM_KEY} prod/app1:api-key,database-url,redis-url",
                         returnStdout: true
                     ).trim()
                     
@@ -322,8 +370,8 @@ ENTRYPOINT ["/entrypoint.sh"]
 #!/bin/sh
 set -e
 
-# Load all configuration at once
-eval $(schema-sheets-get -s /app/schema-sheets-cache \
+# Load all configuration at once (using named queries)
+eval $(schema-sheets-get -n -s /app/schema-sheets-cache \
     "$SCHEMA_SHEETS_ROOM_KEY" \
     "$ENVIRONMENT/app1:api-key,database-url,redis-url,secret")
 
@@ -345,7 +393,7 @@ services:
       - schema-sheets-cache:/app/schema-sheets-cache
     command: |
       sh -c "
-        eval $$(schema-sheets-get -s /app/schema-sheets-cache \
+        eval $$(schema-sheets-get -n -s /app/schema-sheets-cache \
           $$SCHEMA_SHEETS_ROOM_KEY \
           $$ENVIRONMENT/app1:api-key,database-url,redis-url)
         
@@ -376,14 +424,17 @@ schema-sheets-get <room-key> <query>
 When retrieving multiple values, use the multi-property syntax instead of multiple calls:
 
 ```bash
-# Good - single connection, fast
-eval $(schema-sheets-get -s ./cache <room-key> prod/app1:api-key,db-url,redis-url,secret)
+# Good - single connection, fast (named queries)
+eval $(schema-sheets-get -n -s ./cache <room-key> prod/app1:api-key,db-url,redis-url,secret)
+
+# Good - single connection, fast (JMESPath)
+eval $(schema-sheets-get -s ./cache <room-key> "config.{apiKey: apiKey, dbUrl: dbUrl, redisUrl: redisUrl, secret: secret}")
 
 # Avoid - multiple connections, slow
-API_KEY=$(schema-sheets-get -s ./cache <room-key> prod/api-key)
-DB_URL=$(schema-sheets-get -s ./cache <room-key> prod/db-url)
-REDIS_URL=$(schema-sheets-get -s ./cache <room-key> prod/redis-url)
-SECRET=$(schema-sheets-get -s ./cache <room-key> prod/secret)
+API_KEY=$(schema-sheets-get -s ./cache <room-key> "config.apiKey")
+DB_URL=$(schema-sheets-get -s ./cache <room-key> "config.dbUrl")
+REDIS_URL=$(schema-sheets-get -s ./cache <room-key> "config.redisUrl")
+SECRET=$(schema-sheets-get -s ./cache <room-key> "config.secret")
 ```
 
 ### Pre-warming Cache
@@ -392,10 +443,10 @@ In CI/CD pipelines, consider pre-warming the cache:
 
 ```bash
 # Pre-warm cache (output discarded)
-schema-sheets-get -s ./cache "$ROOM_KEY" staging/app1:api-key > /dev/null
+schema-sheets-get -n -s ./cache "$ROOM_KEY" staging/app1:api-key > /dev/null
 
 # Now subsequent calls are instant
-eval $(schema-sheets-get -s ./cache "$ROOM_KEY" staging/app1:api-key,db-url,redis-url)
+eval $(schema-sheets-get -n -s ./cache "$ROOM_KEY" staging/app1:api-key,db-url,redis-url)
 ```
 
 ## Common Use Cases
@@ -415,8 +466,8 @@ if [ -z "$ENVIRONMENT" ]; then
   exit 1
 fi
 
-# Load all configuration for the environment
-eval $(schema-sheets-get -s "$STORAGE" "$ROOM_KEY" \
+# Load all configuration for the environment (using named queries)
+eval $(schema-sheets-get -n -s "$STORAGE" "$ROOM_KEY" \
   "$ENVIRONMENT/app1:api-key,database-url,redis-url,secret,cdn-url")
 
 # Verify required variables are set
@@ -448,8 +499,8 @@ deploy-app \
 ENVIRONMENT=${1:-staging}
 ROOM_KEY="<your-room-key>"
 
-# Generate .env file
-schema-sheets-get --export -s ./cache "$ROOM_KEY" \
+# Generate .env file (using named queries)
+schema-sheets-get -n --export -s ./cache "$ROOM_KEY" \
   "$ENVIRONMENT/app1:api-key,database-url,redis-url,secret" > .env
 
 echo "Configuration written to .env"
@@ -465,8 +516,8 @@ cat .env
 ENVIRONMENT=${1:-staging}
 ROOM_KEY="<your-room-key>"
 
-# Get configuration as JSON
-schema-sheets-get --json -s ./cache "$ROOM_KEY" \
+# Get configuration as JSON (using named queries)
+schema-sheets-get -n --json -s ./cache "$ROOM_KEY" \
   "$ENVIRONMENT/app1:api-key,database-url,redis-url,secret,features" > config.json
 
 echo "Configuration written to config.json"
@@ -484,8 +535,8 @@ node -e "const config = require('./config.json'); console.log('API Key:', config
 ENVIRONMENT=${SCHEMA_ENV:-staging}
 ROOM_KEY=${SCHEMA_SHEETS_ROOM_KEY:?'SCHEMA_SHEETS_ROOM_KEY must be set'}
 
-# Load configuration into current shell
-eval $(schema-sheets-get -s ~/.schema-sheets-cache "$ROOM_KEY" \
+# Load configuration into current shell (using named queries)
+eval $(schema-sheets-get -n -s ~/.schema-sheets-cache "$ROOM_KEY" \
   "$ENVIRONMENT/app1:api-key,database-url,redis-url,secret")
 
 echo "Environment loaded: $ENVIRONMENT"
@@ -533,8 +584,8 @@ However, always:
   env:
     ROOM_KEY: ${{ secrets.SCHEMA_SHEETS_ROOM_KEY }}
   run: |
-    # Use JSON format for safer parsing
-    CONFIG=$(schema-sheets-get --json -s ./cache "$ROOM_KEY" prod/app1:api-key,database-url)
+    # Use JSON format for safer parsing (named queries)
+    CONFIG=$(schema-sheets-get -n --json -s ./cache "$ROOM_KEY" prod/app1:api-key,database-url)
     
     # Parse with jq (safer than eval)
     API_KEY=$(echo "$CONFIG" | jq -r '.["api-key"]')
@@ -557,7 +608,11 @@ If you're experiencing connection problems:
 5. Use `--debug` flag to see detailed connection information
 
 ```bash
-schema-sheets-get --debug -s ./storage <room-key> staging/app1:api-key,database-url
+# For named queries
+schema-sheets-get -n --debug -s ./storage <room-key> staging/app1:api-key,database-url
+
+# For JMESPath queries
+schema-sheets-get --debug -s ./storage <room-key> "config.{apiKey: apiKey, dbUrl: databaseUrl}"
 ```
 
 ### Query Not Found
@@ -591,16 +646,19 @@ If a property is missing from output:
 If variables aren't being set correctly:
 
 ```bash
-# Debug: see what's being output
-schema-sheets-get -s ./storage <room-key> staging/app1:api-key,database-url
+# Debug: see what's being output (named queries)
+schema-sheets-get -n -s ./storage <room-key> staging/app1:api-key,database-url
+
+# Debug: see what's being output (JMESPath)
+schema-sheets-get -s ./storage <room-key> "config.{apiKey: apiKey, dbUrl: databaseUrl}"
 
 # Verify eval syntax
-eval $(schema-sheets-get -s ./storage <room-key> staging/app1:api-key,database-url)
+eval $(schema-sheets-get -n -s ./storage <room-key> staging/app1:api-key,database-url)
 echo "API_KEY=$API_KEY"
 echo "DATABASE_URL=$DATABASE_URL"
 
 # Use --export for sourcing
-source <(schema-sheets-get --export -s ./storage <room-key> staging/app1:api-key,database-url)
+source <(schema-sheets-get -n --export -s ./storage <room-key> staging/app1:api-key,database-url)
 ```
 
 ## Setting up secrets

@@ -14,9 +14,10 @@ const startTime = Date.now()
 
 // get from the cli
 const cmd = command('get', summary('get'), 
-  header('Get data from a schema-sheet using a named query'),
+  header('Get data from a schema-sheet using a named query or JMESPath query'),
   arg('<roomLink>', 'the room link key from schema-sheets'),
-  arg('<queryName>', 'the name of the query to execute (optionally with :property1,property2 for multiple values)'),
+  arg('<query>', 'JMESPath query to execute, or named query when using -n flag'),
+  flag('--named-query|-n', 'Treat query argument as a named query (optionally with :property1,property2)'),
   flag('--storage|-s [storage]', 'Path to storage directory'),
   flag('--blind|-b [blind]', 'Blind peer keys (can be specified multiple times)').multiple(),
   flag('--json|-j', 'Output as JSON (for multiple properties)'),

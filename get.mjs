@@ -210,6 +210,7 @@ async function executeQuery() {
     } else {
       // JMESPath query mode
       debug(`[${Date.now() - startTime}ms] JMESPath query: ${queryInput}`)
+      debug(`[${Date.now() - startTime}ms] Export flag: ${args.flags.export}`)
       
       // Execute the JMESPath query directly
       debug(`[${Date.now() - startTime}ms] Executing JMESPath query...`)
@@ -233,11 +234,15 @@ async function executeQuery() {
       } else {
         // Shell-eval format - flatten first result if it's an object
         const firstResult = results[0].json
+        debug(`[${Date.now() - startTime}ms] First result type: ${typeof firstResult}`)
+        debug(`[${Date.now() - startTime}ms] First result: ${JSON.stringify(firstResult)}`)
         if (typeof firstResult === 'object' && firstResult !== null && !Array.isArray(firstResult)) {
           const exportPrefix = args.flags.export ? 'export ' : ''
+          debug(`[${Date.now() - startTime}ms] Export prefix: "${exportPrefix}"`)
           Object.keys(firstResult).forEach(prop => {
             const varName = propertyToVarName(prop)
             const value = escapeShellValue(firstResult[prop])
+            debug(`[${Date.now() - startTime}ms] Output: ${exportPrefix}${varName}="${value}"`)
             console.log(`${exportPrefix}${varName}="${value}"`)
           })
         } else {

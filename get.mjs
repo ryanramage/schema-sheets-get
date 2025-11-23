@@ -116,21 +116,7 @@ function propertyToVarName(property) {
 
 async function executeQuery() {
   try {
-    // Parse the query argument for multiple properties
-    const queryInput = args.args.queryName
-    const colonIndex = queryInput.indexOf(':')
-    let queryName, properties
-    
-    if (colonIndex !== -1) {
-      queryName = queryInput.substring(0, colonIndex)
-      const propertiesStr = queryInput.substring(colonIndex + 1)
-      properties = propertiesStr.split(',').map(p => p.trim()).filter(p => p.length > 0)
-      debug(`[${Date.now() - startTime}ms] Parsed query: ${queryName}, properties: ${properties.join(', ')}`)
-    } else {
-      queryName = queryInput
-      properties = null
-      debug(`[${Date.now() - startTime}ms] Single property mode, query: ${queryName}`)
-    }
+    const queryInput = args.args.query
     
     // Get the first schema
     debug(`[${Date.now() - startTime}ms] Getting schemas...`)
@@ -146,60 +132,117 @@ async function executeQuery() {
     const schemaId = schemas[0].schemaId
     debug(`[${Date.now() - startTime}ms] Using schema ID: ${schemaId}`)
     
-    // Get the named query
-    debug(`[${Date.now() - startTime}ms] Listing queries...`)
-    const queries = await sheets.listQueries(schemaId)
-    debug(`[${Date.now() - startTime}ms] Queries retrieved: ${queries.length} found`)
+    let results
     
-    const query = queries.find(q => q.name === queryName)
-    
-    if (!query) {
-      console.error(`Query "${queryName}" not found`)
-      await cleanup()
-      process.exit(1)
-    }
-    
-    debug(`[${Date.now() - startTime}ms] Found query: ${query.name}`)
-    
-    // Execute the query
-    debug(`[${Date.now() - startTime}ms] Executing query...`)
-    const results = await sheets.list(schemaId, { query: query.JMESPathQuery })
-    debug(`[${Date.now() - startTime}ms] Query executed, ${results.length} results`)
-    
-    if (results.length === 0) {
-      console.error('No results found')
-      await cleanup()
-      process.exit(1)
-    }
-    
-    const asJson = results[0].json
-    
-    if (!properties) {
-      // Single property mode (backward compatible)
-      const firstField = Object.keys(asJson)[0]
-      const value = asJson[firstField]
-      console.log(value)
-    } else {
-      // Multiple properties mode
-      if (args.flags.json) {
-        // JSON output
-        const output = {}
-        properties.forEach(prop => {
-          if (asJson[prop] !== undefined) {
-            output[prop] = asJson[prop]
-          }
-        })
-        console.log(JSON.stringify(output))
+    if (args.flags.namedQuery) {
+      // Named query mode - parse for property selection
+      const colonIndex = queryInput.indexOf(':')
+      let queryName, properties
+      
+      if (colonIndex !== -1) {
+        queryName = queryInput.substring(0, colonIndex)
+        const propertiesStr = queryInput.substring(colonIndex + 1)
+        properties = propertiesStr.split(',').map(p => p.trim()).filter(p => p.length > 0)
+        debug(`[${Date.now() - startTime}ms] Named query: ${queryName}, properties: ${properties.join(', ')}`)
       } else {
-        // Shell-eval format (default for multiple properties)
-        const exportPrefix = args.flags.export ? 'export ' : ''
-        properties.forEach(prop => {
-          if (asJson[prop] !== undefined) {
+        queryName = queryInput
+        properties = null
+        debug(`[${Date.now() - startTime}ms] Named query single property mode: ${queryName}`)
+      }
+      
+      // Get the named query
+      debug(`[${Date.now() - startTime}ms] Listing queries...`)
+      const queries = await sheets.listQueries(schemaId)
+      debug(`[${Date.now() - startTime}ms] Queries retrieved: ${queries.length} found`)
+      
+      const query = queries.find(q => q.name === queryName)
+      
+      if (!query) {
+        console.error(`Query "${queryName}" not found`)
+        await cleanup()
+        process.exit(1)
+      }
+      
+      debug(`[${Date.now() - startTime}ms] Found query: ${query.name}`)
+      
+      // Execute the named query
+      debug(`[${Date.now() - startTime}ms] Executing named query...`)
+      results = await sheets.list(schemaId, { query: query.JMESPathQuery })
+      debug(`[${Date.now() - startTime}ms] Named query executed, ${results.length} results`)
+      
+      if (results.length === 0) {
+        console.error('No results found')
+        await cleanup()
+        process.exit(1)
+      }
+      
+      const asJson = results[0].json
+      
+      if (!properties) {
+        // Single property mode (backward compatible)
+        const firstField = Object.keys(asJson)[0]
+        const value = asJson[firstField]
+        console.log(value)
+      } else {
+        // Multiple properties mode
+        if (args.flags.json) {
+          // JSON output
+          const output = {}
+          properties.forEach(prop => {
+            if (asJson[prop] !== undefined) {
+              output[prop] = asJson[prop]
+            }
+          })
+          console.log(JSON.stringify(output))
+        } else {
+          // Shell-eval format (default for multiple properties)
+          const exportPrefix = args.flags.export ? 'export ' : ''
+          properties.forEach(prop => {
+            if (asJson[prop] !== undefined) {
+              const varName = propertyToVarName(prop)
+              const value = escapeShellValue(asJson[prop])
+              console.log(`${exportPrefix}${varName}="${value}"`)
+            }
+          })
+        }
+      }
+    } else {
+      // JMESPath query mode
+      debug(`[${Date.now() - startTime}ms] JMESPath query: ${queryInput}`)
+      
+      // Execute the JMESPath query directly
+      debug(`[${Date.now() - startTime}ms] Executing JMESPath query...`)
+      results = await sheets.list(schemaId, { query: queryInput })
+      debug(`[${Date.now() - startTime}ms] JMESPath query executed, ${results.length} results`)
+      
+      if (results.length === 0) {
+        console.error('No results found')
+        await cleanup()
+        process.exit(1)
+      }
+      
+      // For JMESPath queries, output the results based on format flags
+      if (args.flags.json) {
+        // JSON output - output all results
+        if (results.length === 1) {
+          console.log(JSON.stringify(results[0].json))
+        } else {
+          console.log(JSON.stringify(results.map(r => r.json)))
+        }
+      } else {
+        // Shell-eval format - flatten first result if it's an object
+        const firstResult = results[0].json
+        if (typeof firstResult === 'object' && firstResult !== null && !Array.isArray(firstResult)) {
+          const exportPrefix = args.flags.export ? 'export ' : ''
+          Object.keys(firstResult).forEach(prop => {
             const varName = propertyToVarName(prop)
-            const value = escapeShellValue(asJson[prop])
+            const value = escapeShellValue(firstResult[prop])
             console.log(`${exportPrefix}${varName}="${value}"`)
-          }
-        })
+          })
+        } else {
+          // Non-object result, just output the value
+          console.log(firstResult)
+        }
       }
     }
     

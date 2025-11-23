@@ -36,16 +36,13 @@ schema-sheets-get -n --export -s ./storage <room-key> staging/app1:api-key,datab
 **JMESPath Queries (default mode):**
 ```bash
 # Single value output (returns first property value)
-schema-sheets-get -s ./storage <room-key> "environments[?name=='staging'].apps[?name=='app1'].config"
-
-# Get specific value directly
-schema-sheets-get -s ./storage <room-key> "environments[].apps[].config.apiKey | [0]"
+schema-sheets-get -s ./storage <room-key> "[?env=='staging' && app=='keet'].{key: key}"
 
 # Shell variables with export flag
-schema-sheets-get --export -s ./storage <room-key> "environments[?name=='prod'].apps[].{name: name, apiKey: config.apiKey, dbUrl: config.databaseUrl}"
+schema-sheets-get -s ./storage <room-key> "[?env=='staging' && app=='keet'].{key: key} --export"
 
 # JSON output
-schema-sheets-get --json -s ./storage <room-key> "config.{apiKey: apiKey, dbUrl: databaseUrl}"
+schema-sheets-get -s ./storage <room-key> "[?env=='staging' && app=='keet'].{key: key} --json"
 ```
 
 ### Options
@@ -73,22 +70,7 @@ The tool supports two query modes:
 Use JMESPath syntax to query your data directly. This is the most flexible and powerful mode:
 
 ```bash
-# Single value output (default - returns first property value)
-schema-sheets-get -s ./storage <room-key> "environments[?name=='staging'].apps[?name=='app1'].config"
-# Output: value-of-first-property
-
-# Get specific value directly
-schema-sheets-get -s ./storage <room-key> "config.apiKey"
-# Output: your-api-key-value
-
-# Shell variables (with --export flag)
-schema-sheets-get --export -s ./storage <room-key> "environments[?name=='prod'].apps[].{name: name, key: config.apiKey}"
-# Output: export NAME="app-name"
-#         export KEY="api-key-value"
-
-# JSON output
-schema-sheets-get --json -s ./storage <room-key> "config.{apiKey: apiKey, dbUrl: databaseUrl}"
-# Output: {"apiKey":"value","dbUrl":"value"}
+schema-sheets-get -s ./storage <room-key> "[?env=='staging' && app=='keet'].{key: key}"
 ```
 
 ### Named Queries (with `-n` flag)
@@ -169,7 +151,7 @@ For shell-eval format, property names are automatically transformed to valid she
 
 ```bash
 # Using JMESPath queries (returns single value)
-API_KEY=$(schema-sheets-get -s ./storage <room-key> "config.apiKey")
+API_KEY=$(schema-sheets-get -s ./storage <room-key> "[?env=='staging' && app=='keet'].{key: key}")
 
 # Using named queries (returns single value)
 API_KEY=$(schema-sheets-get -n -s ./storage <room-key> prod/api-key)

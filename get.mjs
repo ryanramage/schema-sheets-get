@@ -236,18 +236,31 @@ async function executeQuery() {
         const firstResult = results[0].json
         debug(`[${Date.now() - startTime}ms] First result type: ${typeof firstResult}`)
         debug(`[${Date.now() - startTime}ms] First result: ${JSON.stringify(firstResult)}`)
-        if (typeof firstResult === 'object' && firstResult !== null && !Array.isArray(firstResult)) {
-          const exportPrefix = args.flags.export ? 'export ' : ''
-          debug(`[${Date.now() - startTime}ms] Export prefix: "${exportPrefix}"`)
-          Object.keys(firstResult).forEach(prop => {
-            const varName = propertyToVarName(prop)
-            const value = escapeShellValue(firstResult[prop])
-            debug(`[${Date.now() - startTime}ms] Output: ${exportPrefix}${varName}="${value}"`)
-            console.log(`${exportPrefix}${varName}="${value}"`)
-          })
+        
+        if (args.flags.export) {
+          // Export mode - output shell variables with export prefix
+          if (typeof firstResult === 'object' && firstResult !== null && !Array.isArray(firstResult)) {
+            Object.keys(firstResult).forEach(prop => {
+              const varName = propertyToVarName(prop)
+              const value = escapeShellValue(firstResult[prop])
+              debug(`[${Date.now() - startTime}ms] Output: export ${varName}="${value}"`)
+              console.log(`export ${varName}="${value}"`)
+            })
+          } else {
+            // Non-object result, just output the value
+            console.log(firstResult)
+          }
         } else {
-          // Non-object result, just output the value
-          console.log(firstResult)
+          // Default mode - output first property value (like named query single property mode)
+          if (typeof firstResult === 'object' && firstResult !== null && !Array.isArray(firstResult)) {
+            const firstField = Object.keys(firstResult)[0]
+            const value = firstResult[firstField]
+            debug(`[${Date.now() - startTime}ms] Output: ${value}`)
+            console.log(value)
+          } else {
+            // Non-object result, just output the value
+            console.log(firstResult)
+          }
         }
       }
     }

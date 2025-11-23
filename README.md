@@ -157,7 +157,7 @@ API_KEY=$(schema-sheets-get -s ./storage <room-key> "[?env=='staging' && app=='k
 API_KEY=$(schema-sheets-get -n -s ./storage <room-key> prod/api-key)
 
 # Use directly in commands
-curl -H "Authorization: Bearer $(schema-sheets-get -s ./storage <room-key> "config.token")" https://api.example.com
+curl -H "Authorization: Bearer $(schema-sheets-get -s ./storage <room-key> "[?env=='staging' && app=='keet'].{key: key}")" https://api.example.com
 ```
 
 ### Multiple Values with eval
@@ -275,14 +275,12 @@ jobs:
         env:
           ROOM_KEY: ${{ secrets.SCHEMA_SHEETS_ROOM_KEY }}
         run: |
-          CONFIG=$(schema-sheets-get -n --json -s ./cache "$ROOM_KEY" prod/app1:api-key,database-url)
-          echo "config=$CONFIG" >> $GITHUB_OUTPUT
+          API_KEY=$(schema-sheets-get -s ./cache "$ROOM_KEY" "[?env=='production' && app=='keet'].{key: key}")
+          echo "api-key=$API_KEY" >> $GITHUB_OUTPUT
           
       - name: Deploy
         run: |
-          API_KEY=$(echo '${{ steps.config.outputs.config }}' | jq -r '.["api-key"]')
-          DATABASE_URL=$(echo '${{ steps.config.outputs.config }}' | jq -r '.["database-url"]')
-          ./deploy.sh "$API_KEY" "$DATABASE_URL"
+          ./deploy.sh "${{ steps.config.outputs.api-key }}"
 ```
 
 ### GitLab CI
@@ -444,10 +442,10 @@ eval $(schema-sheets-get -n -s ./cache <room-key> prod/app1:api-key,db-url,redis
 eval $(schema-sheets-get --export -s ./cache <room-key> "config.{apiKey: apiKey, dbUrl: dbUrl, redisUrl: redisUrl, secret: secret}")
 
 # Avoid - multiple connections, slow
-API_KEY=$(schema-sheets-get -s ./cache <room-key> "config.apiKey")
-DB_URL=$(schema-sheets-get -s ./cache <room-key> "config.dbUrl")
-REDIS_URL=$(schema-sheets-get -s ./cache <room-key> "config.redisUrl")
-SECRET=$(schema-sheets-get -s ./cache <room-key> "config.secret")
+API_KEY=$(schema-sheets-get -s ./cache <room-key> "[?env=='staging' && app=='keet'].{key: key}")
+DB_URL=$(schema-sheets-get -s ./cache <room-key> "[?env=='staging' && app=='keet'].{dbUrl: dbUrl}")
+REDIS_URL=$(schema-sheets-get -s ./cache <room-key> "[?env=='staging' && app=='keet'].{redisUrl: redisUrl}")
+SECRET=$(schema-sheets-get -s ./cache <room-key> "[?env=='staging' && app=='keet'].{secret: secret}")
 ```
 
 ### Pre-warming Cache
@@ -456,7 +454,7 @@ In CI/CD pipelines, consider pre-warming the cache:
 
 ```bash
 # Pre-warm cache (output discarded)
-schema-sheets-get -n -s ./cache "$ROOM_KEY" staging/app1:api-key > /dev/null
+schema-sheets-get -s ./cache "$ROOM_KEY" "[?env=='staging' && app=='keet'].{key: key}" > /dev/null
 
 # Now subsequent calls are instant
 eval $(schema-sheets-get -n -s ./cache "$ROOM_KEY" staging/app1:api-key,db-url,redis-url)
@@ -537,6 +535,10 @@ echo "Configuration written to config.json"
 
 # Use with Node.js
 node -e "const config = require('./config.json'); console.log('API Key:', config['api-key'])"
+
+# Or get single value directly
+API_KEY=$(schema-sheets-get -s ./cache "$ROOM_KEY" "[?env=='$ENVIRONMENT' && app=='keet'].{key: key}")
+echo "API Key: $API_KEY"
 ```
 
 ### Dynamic Environment Loading
@@ -555,6 +557,10 @@ eval $(schema-sheets-get -n -s ~/.schema-sheets-cache "$ROOM_KEY" \
 echo "Environment loaded: $ENVIRONMENT"
 echo "API_KEY: ${API_KEY:0:10}..."
 echo "DATABASE_URL: $DATABASE_URL"
+
+# Example of getting a single value
+API_KEY=$(schema-sheets-get -s ~/.schema-sheets-cache "$ROOM_KEY" "[?env=='$ENVIRONMENT' && app=='keet'].{key: key}")
+echo "Single API Key: ${API_KEY:0:10}..."
 ```
 
 Usage:
@@ -604,6 +610,9 @@ However, always:
     API_KEY=$(echo "$CONFIG" | jq -r '.["api-key"]')
     DATABASE_URL=$(echo "$CONFIG" | jq -r '.["database-url"]')
     
+    # Or get single values directly (even safer)
+    API_KEY=$(schema-sheets-get -s ./cache "$ROOM_KEY" "[?env=='production' && app=='keet'].{key: key}")
+    
     # Use in deployment
     ./deploy.sh "$API_KEY" "$DATABASE_URL"
 ```
@@ -625,7 +634,7 @@ If you're experiencing connection problems:
 schema-sheets-get -n --debug -s ./storage <room-key> staging/app1:api-key,database-url
 
 # For JMESPath queries (single value)
-schema-sheets-get --debug -s ./storage <room-key> "config.apiKey"
+schema-sheets-get --debug -s ./storage <room-key> "[?env=='staging' && app=='keet'].{key: key}"
 
 # For JMESPath queries (shell variables)
 schema-sheets-get --export --debug -s ./storage <room-key> "config.{apiKey: apiKey, dbUrl: databaseUrl}"
@@ -666,7 +675,7 @@ If variables aren't being set correctly:
 schema-sheets-get -n -s ./storage <room-key> staging/app1:api-key,database-url
 
 # Debug: see what's being output (JMESPath single value)
-schema-sheets-get -s ./storage <room-key> "config.apiKey"
+schema-sheets-get -s ./storage <room-key> "[?env=='staging' && app=='keet'].{key: key}"
 
 # Debug: see what's being output (JMESPath shell variables)
 schema-sheets-get --export -s ./storage <room-key> "config.{apiKey: apiKey, dbUrl: databaseUrl}"
@@ -677,9 +686,9 @@ echo "API_KEY=$API_KEY"
 echo "DATABASE_URL=$DATABASE_URL"
 
 # Verify eval syntax (JMESPath)
-eval $(schema-sheets-get --export -s ./storage <room-key> "config.{apiKey: apiKey, dbUrl: databaseUrl}")
-echo "API_KEY=$API_KEY"
-echo "DATABASE_URL=$DATABASE_URL"
+eval $(schema-sheets-get --export -s ./storage <room-key> "[?env=='staging' && app=='keet'].{key: key, dbUrl: dbUrl}")
+echo "KEY=$KEY"
+echo "DBURL=$DBURL"
 
 # Use --export for sourcing
 source <(schema-sheets-get -n --export -s ./storage <room-key> staging/app1:api-key,database-url)
